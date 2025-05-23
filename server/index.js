@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -6,7 +7,6 @@ const axios = require('axios');
 const authMiddleware = require('./middleware/auth');
 const { pool, testConnection, initializeDatabase } = require('./config/database');
 const admin = require('./config/firebase');
-require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;

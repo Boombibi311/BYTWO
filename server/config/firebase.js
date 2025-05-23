@@ -1,3 +1,4 @@
+require('dotenv').config();
 const admin = require('firebase-admin');
 
 // Initialize Firebase Admin using environment variables
@@ -14,6 +15,13 @@ const serviceAccount = {
   client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,
   universe_domain: "googleapis.com"
 };
+
+// Debug: Log environment variables (remove in production)
+console.log('Environment check:', {
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+  hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL
+});
 
 // Initialize Firebase Admin
 console.log('Initializing Firebase Admin with project:', serviceAccount.project_id);
