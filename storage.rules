@@ -1,0 +1,36 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is accessing their own data
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Helper function to check if request is from allowed origins
+    function isAllowedOrigin() {
+      return request.origin.matches('http://localhost:3000') || 
+             request.origin.matches('https://bytwo-6cd4b.web.app');
+    }
+
+    // Rules for user photos
+    match /users/{userId}/{allPaths=**} {
+      // Allow read if the user is authenticated and accessing their own data
+      // OR if the request is from an allowed origin
+      allow read: if isOwner(userId) || isAllowedOrigin();
+      
+      // Allow write only if the user is authenticated and accessing their own data
+      allow write: if isOwner(userId);
+    }
+
+    // Default deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+} 
