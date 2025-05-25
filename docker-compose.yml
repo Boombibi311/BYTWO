@@ -12,41 +12,13 @@ services:
       - PORT=3001
       # Firebase Admin SDK
       - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
-      - FIREBASE_PRIVATE_KEY_ID=${FIREBASE_PRIVATE_KEY_ID}
-      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
-      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
-      - FIREBASE_CLIENT_ID=${FIREBASE_CLIENT_ID}
-      - FIREBASE_CLIENT_CERT_URL=${FIREBASE_CLIENT_CERT_URL}
+      - FIREBASE_SERVICE_ACCOUNT=${FIREBASE_SERVICE_ACCOUNT}
       - FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET}
-      # MySQL
-      - MYSQL_HOST=${MYSQL_HOST:-mysql}
-      - MYSQL_USER=${MYSQL_USER}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
       # Segmind API
       - SEGMIND_API_KEY=${SEGMIND_API_KEY}
-    depends_on:
-      - mysql
-    networks:
-      - bytwo-network
-
-  mysql:
-    image: mysql:8.0
-    ports:
-      - "3306:3306"
-    environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_USER=${MYSQL_USER}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-    volumes:
-      - mysql-data:/var/lib/mysql
     networks:
       - bytwo-network
 
 networks:
   bytwo-network:
-    driver: bridge
-
-volumes:
-  mysql-data: 
+    driver: bridge 

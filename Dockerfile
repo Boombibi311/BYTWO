@@ -1,10 +1,9 @@
 # Build React app
-FROM node:18 AS build-frontend
+FROM node:18-alpine AS build-frontend
 WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm install
 COPY client/ ./
-# These env vars are passed as build args from the deploy command!
 ARG REACT_APP_FIREBASE_API_KEY
 ARG REACT_APP_FIREBASE_AUTH_DOMAIN
 ARG REACT_APP_FIREBASE_PROJECT_ID
@@ -22,13 +21,16 @@ ENV REACT_APP_FIREBASE_MEASUREMENT_ID=$REACT_APP_FIREBASE_MEASUREMENT_ID
 RUN npm run build
 
 # Build Node.js backend
-FROM node:18
+FROM node:18-alpine
 WORKDIR /app
 COPY server/package*.json ./
-RUN npm install
+RUN npm install --production
 COPY server/ ./
-# Copy built React app into the backend's public directory
 COPY --from=build-frontend /app/client/build ./client/build
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=8080
 
 # Expose port
 EXPOSE 8080
