@@ -1,5 +1,6 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
+const admin = require("firebase-admin");
 
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST,
@@ -10,6 +11,17 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
+});
+
+// Option A: Read from a secret (or env var) (recommended)
+const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT; // (or read from a mounted secret file)
+const serviceAccount = JSON.parse(serviceAccountJson);
+
+// Option B: Read from a JSON file (if you copy it in your Dockerfile)
+// const serviceAccount = require("/app/serviceAccountKey.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
 });
 
 async function testConnection() {
@@ -50,5 +62,6 @@ async function initializeDatabase() {
 module.exports = {
   pool,
   testConnection,
-  initializeDatabase
+  initializeDatabase,
+  admin
 }; 
