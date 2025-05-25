@@ -6,14 +6,23 @@ const path = require('path');
 const axios = require('axios');
 const authMiddleware = require('./middleware/auth');
 const { pool, testConnection, initializeDatabase } = require('./config/database');
-const admin = require('./config/firebase');
+// Move Firebase initialization to after server starts
+let admin;
+try {
+  admin = require('./config/firebase');
+} catch (error) {
+  console.error('Firebase initialization error:', error);
+  // Don't exit, we'll retry later
+}
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 8080;
 
 // CORS configuration
 const corsOptions = {
-  origin: 'http://localhost:3000',
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://bytwo-*.run.app', 'https://*.bytwo.app']  // Add your Cloud Run domain
+    : 'http://localhost:3000',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
   credentials: true
@@ -24,13 +33,71 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(morgan('dev'));
 
-// Test database connection
-testConnection();
+// Initialize Firebase Admin asynchronously
+async function initializeFirebase() {
+  try {
+    if (!admin) {
+      console.log('Retrying Firebase initialization...');
+      admin = require('./config/firebase');
+    }
+    console.log('Firebase Admin initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('Firebase initialization failed:', error);
+    return false;
+  }
+}
 
-// Initialize database tables
-initializeDatabase();
+// Test database connection and initialize tables asynchronously
+async function initializeDatabaseConnection() {
+  let retries = 5; // Increased retries
+  let delay = 1000; // Start with 1 second delay
+
+  while (retries > 0) {
+    try {
+      console.log(`Attempting database connection (${retries} attempts remaining)...`);
+      const isConnected = await testConnection();
+      
+      if (isConnected) {
+        console.log('Database connection successful');
+        try {
+          console.log('Initializing database tables...');
+          await initializeDatabase();
+          console.log('Database tables initialized successfully');
+          return true;
+        } catch (initError) {
+          console.error('Database initialization error:', initError);
+          // Continue even if table initialization fails
+          return true;
+        }
+      } else {
+        throw new Error('Database connection test failed');
+      }
+    } catch (error) {
+      console.error(`Database connection attempt failed: ${error.message}`);
+      retries--;
+      
+      if (retries > 0) {
+        console.log(`Retrying in ${delay/1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 1.5; // Gentler backoff
+      }
+    }
+  }
+  
+  console.error('Failed to connect to database after all retries');
+  return false;
+}
 
 // Public routes
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 app.get('/api/hello', (req, res) => {
   res.json({ message: 'Hello from the server!' });
 });
@@ -316,6 +383,50 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
+// Start the server immediately
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
-}); 
+  console.log('Environment:', process.env.NODE_ENV);
+  console.log('CORS origin:', corsOptions.origin);
+  console.log('Database host:', process.env.MYSQL_HOST);
+  console.log('Firebase project:', process.env.FIREBASE_PROJECT_ID);
+  
+  // Initialize services after server starts
+  Promise.all([
+    initializeDatabaseConnection(),
+    initializeFirebase()
+  ]).catch(error => {
+    console.error('Service initialization failed:', error);
+    // Don't exit the process, just log the error
+  });
+});
+
+// Add graceful shutdown with timeout
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  const forceShutdown = setTimeout(() => {
+    console.error('Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000); // 10 second timeout
+
+  server.close(() => {
+    clearTimeout(forceShutdown);
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
+});
+
+// Add uncaught exception handler
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Don't exit the process, just log the error
+});
+
+// Add unhandled rejection handler
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit the process, just log the error
+});
+
+// Export admin for use in other files
+module.exports = { admin }; 

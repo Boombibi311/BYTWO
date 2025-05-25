@@ -1,4 +1,4 @@
-const admin = require('../config/firebase');
+const { admin } = require('../index'); // Get admin from main app
 const { pool } = require('../config/database');
 
 // Middleware to verify Firebase token and sync user
@@ -7,6 +7,12 @@ const authMiddleware = async (req, res, next) => {
   
   if (!authHeader?.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'No token provided' });
+  }
+
+  // Check if Firebase Admin is initialized
+  if (!admin) {
+    console.error('Firebase Admin not initialized');
+    return res.status(503).json({ error: 'Authentication service unavailable' });
   }
 
   try {
@@ -33,7 +39,9 @@ const authMiddleware = async (req, res, next) => {
       next();
     } catch (error) {
       console.error('Database sync error:', error.message);
-      return res.status(500).json({ error: 'Error syncing user data' });
+      // Don't fail the request if database sync fails
+      req.user = { uid, email, name, picture, email_verified };
+      next();
     }
   } catch (error) {
     console.error('Token verification error:', error.message);

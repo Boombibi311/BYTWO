@@ -12,7 +12,16 @@ RUN npm install
 # Copy client source code
 COPY client/ ./
 
-# Build client
+# Set build-time environment variables for React
+ARG REACT_APP_FIREBASE_API_KEY
+ARG REACT_APP_FIREBASE_AUTH_DOMAIN
+ARG REACT_APP_FIREBASE_PROJECT_ID
+ARG REACT_APP_FIREBASE_STORAGE_BUCKET
+ARG REACT_APP_FIREBASE_MESSAGING_SENDER_ID
+ARG REACT_APP_FIREBASE_APP_ID
+ARG REACT_APP_FIREBASE_MEASUREMENT_ID
+
+# Build client with environment variables
 RUN npm run build
 
 # Build stage for server
@@ -41,15 +50,18 @@ COPY --from=client-builder /app/client/build ./client/build
 COPY --from=server-builder /app/server ./server
 COPY --from=server-builder /app/server/node_modules ./server/node_modules
 
-# Copy environment files
-COPY .env ./server/.env
-COPY client/.env ./client/.env
-
 # Set working directory to server
 WORKDIR /app/server
 
-# Expose server port
-EXPOSE 3001
+# Cloud Run will set this environment variable
+ENV PORT=8080
+
+# Expose the port Cloud Run will use
+EXPOSE 8080
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/api/health || exit 1
 
 # Start the server
 CMD ["npm", "start"] 
